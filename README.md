@@ -71,7 +71,7 @@ legaily/
 ```bash
 cd legaily_backend
 npm install
-npm start
+node server.js
 
 ### Frontend:
 cd legaily
