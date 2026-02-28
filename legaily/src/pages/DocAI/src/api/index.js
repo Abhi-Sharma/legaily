@@ -1,5 +1,6 @@
 import axios from "axios";
 
+// FastAPI DocAI backend runs on port 8000 with `/api` prefix
 const BASE_URL = "http://localhost:8000/api";
 
 export const processFile = async (file, action) => {

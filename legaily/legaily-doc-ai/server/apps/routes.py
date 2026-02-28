@@ -1,11 +1,28 @@
 from fastapi import APIRouter, File, UploadFile, Form
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 import os
 from apps.services.ocr import extract_text
 from apps.services.summarizer import summarize_text
-from apps.services.translator import google_translate_text  # Using only this now
+from apps.services.translator import google_translate_text
+from apps.services.chat import chat as legal_chat
 
 router = APIRouter()
+
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[dict] | None = None
+
+
+@router.post("/chat/")
+async def chat_endpoint(body: ChatRequest):
+    """Legal AI Assistant: reply using Cohere Chat API."""
+    try:
+        reply = legal_chat(body.message, body.history)
+        return {"reply": reply}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
 
 # Summarization endpoint (unchanged)
 @router.post("/process/")
