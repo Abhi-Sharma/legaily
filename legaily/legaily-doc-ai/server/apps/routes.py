@@ -50,6 +50,7 @@ async def google_translate_file(
         print("Google API Key:", api_key)
         text = await extract_text(file)
 
+        # Indian languages with reliable support (Google Translate API + gtx/LibreTranslate/MyMemory)
         google_languages = {
             "english": "en",
             "hindi": "hi",

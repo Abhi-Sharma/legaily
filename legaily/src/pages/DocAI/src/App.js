@@ -71,10 +71,11 @@ const DocAIPage = () => {
         <label htmlFor="file-upload" className="docai-upload-btn">
           {file ? "Change File" : "Upload File"}
         </label>
-        <span className="docai-selected-file">
-          {file ? `Selected file: ${file.name}` : "No file selected"}
+        <span className="docai-selected-file" title={file ? file.name : ""}>
+          {file ? file.name : "No file selected"}
         </span>
 
+        <div className="docai-controls-group">
         <div className="docai-btn-group">
           {["translate", "summarize"].map((opt) => (
             <button
@@ -87,34 +88,27 @@ const DocAIPage = () => {
           ))}
         </div>
 
-        {action === "translate" && (
+        <div className="docai-language-wrapper">
           <select
             className="docai-language-select"
-            value={targetLanguage}
+            value={action === "translate" ? targetLanguage : ""}
             onChange={(e) => setTargetLanguage(e.target.value)}
+            disabled={action === "summarize"}
           >
-            <option value="">-- Select Language --</option>
+            <option value="">
+              {action === "summarize" ? "—" : "-- Select Language --"}
+            </option>
             {[
-              "hindi",
-              "kannada",
-              "english",
-              "tamil",
-              "telugu",
-              "marathi",
-              "malayalam",
-              "bengali",
-              "gujarati",
-              "punjabi",
+              "hindi", "english", "bengali", "telugu", "marathi", "tamil",
+              "urdu", "gujarati", "kannada", "malayalam", "punjabi", "odia",
               "assamese",
-              "urdu",
-              "odia",
             ].map((lang) => (
               <option key={lang} value={lang}>
                 {lang.charAt(0).toUpperCase() + lang.slice(1)}
               </option>
             ))}
           </select>
-        )}
+        </div>
 
         <button
           className="docai-get-answer"
@@ -123,6 +117,7 @@ const DocAIPage = () => {
         >
           {loading ? "Processing..." : "Get Answer"}
         </button>
+        </div>
       </div>
 
       <div className="docai-content">

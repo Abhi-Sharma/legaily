@@ -155,6 +155,7 @@ export default function Home({ user }) {
                       and ML.
                     </div>
                     <button
+                      onClick={() => navigate("/docai")}
                       style={{
                         background: mainOrange,
                         color: "#fff",
