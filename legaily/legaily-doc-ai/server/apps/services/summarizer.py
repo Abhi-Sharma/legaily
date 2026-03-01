@@ -11,6 +11,24 @@ _LEGAL_CASE_INDICATORS = [
     "obiter dicta", "order", "appeal", "respondent", "court of",
 ]
 
+# Keywords that indicate a legal contract/agreement (not a court judgment)
+_LEGAL_CONTRACT_INDICATORS = [
+    "agreement", "licensor", "licensee", "party", "parties", "clause",
+    "warranty", "warranties", "termination", "liability", "intellectual property",
+    "schedule", "execution", "hereby grants", "effective date", "charges",
+    "invoice", "breach", "indemnity", "confidentiality", "term of",
+    "governing law", "jurisdiction", "assignment", "force majeure",
+]
+
+
+def _looks_like_legal_contract(text: str) -> bool:
+    """Heuristic: text likely represents a legal contract or agreement."""
+    if not text or len(text) < 100:
+        return False
+    sample = text[:12000].lower()
+    hits = sum(1 for k in _LEGAL_CONTRACT_INDICATORS if k in sample)
+    return hits >= 3
+
 
 def _looks_like_legal_case(text: str) -> bool:
     """Heuristic: text likely represents an Indian court judgment/case."""
@@ -19,6 +37,35 @@ def _looks_like_legal_case(text: str) -> bool:
     sample = text[:12000].lower()
     hits = sum(1 for k in _LEGAL_CASE_INDICATORS if k in sample)
     return hits >= 3
+
+
+def _build_legal_contract_prompt(text: str) -> str:
+    """Structured prompt for summarizing legal contracts/agreements for lawyers and judges."""
+    max_chars = int(os.getenv("SUMMARY_MAX_CHARS", "12000"))
+    if len(text) > max_chars:
+        text = text[:max_chars] + "\n\n[... text truncated ...]"
+
+    return """You are summarizing a legal contract or agreement for lawyers and judges. Extract and present the following so a reader instantly understands the document. Use bullet points or short sections. If a field is not found, write "Not specified."
+
+1. **Document Type**: e.g., Software Licence Agreement, NDA, Service Agreement
+2. **Parties**: Who are the contracting parties (e.g., Licensor, Licensee; Buyer, Seller)
+3. **Subject Matter**: What is being contracted (software, services, IP, etc.)
+4. **Key Definitions**: Important defined terms (e.g., Software, Effective Date, Charges, Term)
+5. **Main Obligations**: Core duties of each party
+6. **Payment / Charges**: How much, when, payment terms
+7. **Term & Termination**: Duration, notice period, termination for cause/convenience
+8. **Warranties & Limitations**: Key warranties; exclusion of implied warranties
+9. **Liability**: Caps, exclusions (death/personal injury, fraud often non-excludable)
+10. **Governing Law & Jurisdiction**: Which law and courts apply
+11. **Important Clauses**: Any critical provisions (IP assignment, confidentiality, indemnity, etc.)
+
+End with **Key Terms at a Glance**: A short bullet list of the most important legal terms and their effect.
+
+Write only the structured summary. No preamble. Use plain English. Be concise but complete enough for quick review.
+
+---
+Document:
+""" + text
 
 
 def _build_legal_case_prompt(text: str) -> str:
@@ -66,9 +113,12 @@ def summarize_text(text):
             return summarize_with_transformers(text)
 
         co = cohere.ClientV2(api_key=cohere_api_key)
-        is_legal = _looks_like_legal_case(text)
+        is_contract = _looks_like_legal_contract(text)
+        is_case = _looks_like_legal_case(text)
 
-        if is_legal:
+        if is_contract:
+            message = _build_legal_contract_prompt(text)
+        elif is_case:
             message = _build_legal_case_prompt(text)
         else:
             word_count = len(text.split())
@@ -108,7 +158,29 @@ def summarize_with_transformers(text: str) -> str:
     if not text or not text.strip():
         return "No text content to summarize."
 
-    if _looks_like_legal_case(text):
+    if _looks_like_legal_contract(text):
+        # For legal contracts without Cohere: extract structured info
+        head = text[:8000].strip()
+        parts = []
+        for label, pattern in [
+            ("Document Type", r"^(?:SOFTWARE\s+LICENCE\s+AGREEMENT|agreement|AGREEMENT)[:\s]*([^\n]*)", re.I | re.M),
+            ("Parties", r"(?:Licensor|Licensee|PARTIES)[:\s]*([^\n]+(?:\n[^\n]+){0,2})", re.I),
+            ("Subject", r"(?:Software|Subject\s+Matter)[:\s]*([^\n]+)", re.I),
+            ("Effective Date", r"Effective\s+Date[:\s]*([^\n]+)", re.I),
+            ("Term", r"Term[:\s]*([^\n]+(?:\n[^\n]+){0,1})", re.I),
+            ("Charges", r"Charges[:\s]*([^\n]+)", re.I),
+            ("Termination", r"Termination[:\s]*([^\n]+(?:\n[^\n]+){0,2})", re.I),
+            ("Governing Law", r"governed\s+by.*?([^\n]+)", re.I),
+        ]:
+            m = re.search(pattern, head, re.M | re.S)
+            if m:
+                val = m.group(1).strip()[:300].replace("\n", " ")
+                if val:
+                    parts.append(f"**{label}**: {val}")
+        if parts:
+            return "\n".join(parts) + "\n\n**Note**: For a fuller summary with key terms, use an API key (COHERE_API_KEY)."
+        # Fall through to generic if extraction yielded little
+    elif _looks_like_legal_case(text):
         # For legal cases without Cohere: extract structured info from first ~8000 chars
         head = text[:8000].strip()
         parts = []
