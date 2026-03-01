@@ -1,5 +1,39 @@
 import os
+import re
 import requests
+
+# Max chars per chunk to avoid 414 Request-URI Too Large (MyMemory uses GET)
+# and to stay within typical API limits for LibreTranslate/gtx
+_TRANSLATE_CHUNK_MAX = int(os.getenv("TRANSLATE_CHUNK_MAX", "800"))
+
+
+def _chunk_text(text: str, max_chars: int = _TRANSLATE_CHUNK_MAX) -> list[str]:
+    """Split text into chunks that fit within URL/API limits. Prefer paragraph boundaries."""
+    if not text or len(text.strip()) <= max_chars:
+        return [text.strip()] if text and text.strip() else []
+
+    chunks = []
+    remaining = text.strip()
+
+    while remaining:
+        if len(remaining) <= max_chars:
+            chunks.append(remaining)
+            break
+        cut = remaining[:max_chars]
+        # Prefer breaking at paragraph or sentence boundary
+        last_para = max(cut.rfind("\n\n"), cut.rfind("\n"))
+        ends = [m.end() for m in re.finditer(r"[.!?]\s+", cut) if m.end() <= max_chars]
+        last_sent = max(ends) if ends else -1
+        split_at = max(last_para, last_sent, max_chars // 2)
+        if split_at <= 0:
+            split_at = max_chars
+        chunk = remaining[:split_at].strip()
+        if chunk:
+            chunks.append(chunk)
+        remaining = remaining[split_at:].lstrip()
+
+    return chunks
+
 
 def google_translate_text(text, target_language):
     if not text or not text.strip():
@@ -43,32 +77,36 @@ def google_translate_text(text, target_language):
 def gtx_translate_text(text, target_language):
     """
     No-key translation via translate.googleapis.com (client=gtx).
-    This is an unofficial endpoint; keep as a fallback for development/demo use.
+    Chunks long text to avoid URL size limits.
     """
     if not text or not text.strip():
         return "No text content to translate."
 
     try:
-        r = requests.get(
-            "https://translate.googleapis.com/translate_a/single",
-            params={
-                "client": "gtx",
-                "sl": "auto",
-                "tl": target_language,
-                "dt": "t",
-                "q": text,
-            },
-            timeout=60,
-        )
-        r.raise_for_status()
-
-        # Response is a nested JSON array; first element contains translated chunks.
-        data = r.json()
-        chunks = (data[0] or []) if isinstance(data, list) and len(data) > 0 else []
-        translated = "".join((c[0] or "") for c in chunks if isinstance(c, list) and len(c) > 0)
-        return translated or "Translation returned empty result."
+        chunks = _chunk_text(text)
+        translated_parts = []
+        for chunk in chunks:
+            if not chunk.strip():
+                continue
+            r = requests.get(
+                "https://translate.googleapis.com/translate_a/single",
+                params={
+                    "client": "gtx",
+                    "sl": "auto",
+                    "tl": target_language,
+                    "dt": "t",
+                    "q": chunk,
+                },
+                timeout=60,
+            )
+            r.raise_for_status()
+            data = r.json()
+            frags = (data[0] or []) if isinstance(data, list) and len(data) > 0 else []
+            tr = "".join((c[0] or "") for c in frags if isinstance(c, list) and len(c) > 0)
+            if tr:
+                translated_parts.append(tr)
+        return "\n".join(translated_parts) if translated_parts else "Translation returned empty result."
     except Exception as e:
-        # Optional fallback: LibreTranslate if configured, else MyMemory.
         try:
             return libretranslate_text(text, target_language)
         except Exception:
@@ -78,8 +116,7 @@ def gtx_translate_text(text, target_language):
 def libretranslate_text(text, target_language):
     """
     Free fallback translator using LibreTranslate.
-    - Default URL uses a public instance; for reliability, self-host and set LIBRETRANSLATE_URL.
-    - Supports auto source language detection.
+    Chunks long text to avoid 400 Bad Request / payload limits.
     """
     if not text or not text.strip():
         return "No text content to translate."
@@ -88,52 +125,59 @@ def libretranslate_text(text, target_language):
     api_key = os.getenv("LIBRETRANSLATE_API_KEY")
 
     try:
-        # LibreTranslate accepts JSON; keep it simple and robust.
-        payload = {
-            "q": text,
-            "source": "auto",
-            "target": target_language,
-            "format": "text",
-        }
-        if api_key:
-            payload["api_key"] = api_key
+        chunks = _chunk_text(text)
+        translated_parts = []
+        for chunk in chunks:
+            if not chunk.strip():
+                continue
+            payload = {
+                "q": chunk,
+                "source": "auto",
+                "target": target_language,
+                "format": "text",
+            }
+            if api_key:
+                payload["api_key"] = api_key
 
-        resp = requests.post(url, json=payload, timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-        translated = data.get("translatedText")
-        if translated:
-            return translated
-
-        # Some instances may return a different shape; fall back gracefully.
-        return str(data) if data else "Translation succeeded but response was empty."
+            resp = requests.post(url, json=payload, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            tr = data.get("translatedText")
+            if tr:
+                translated_parts.append(tr)
+        return "\n".join(translated_parts) if translated_parts else "Translation returned empty."
     except Exception as e:
-        # Last-resort no-key fallback: MyMemory (requires a fixed source language pair).
         return mymemory_text(text, target_language, error=str(e))
 
 
 def mymemory_text(text, target_language, error=None):
     """
-    Backup fallback using MyMemory (no API key by default, but rate-limited).
-    MyMemory requires a source|target langpair; we assume source is English.
+    Backup fallback using MyMemory. Chunks text to avoid 414 Request-URI Too Large
+    (MyMemory uses GET with text in URL; URLs are length-limited).
     """
     if not text or not text.strip():
         return "No text content to translate."
 
+    source = os.getenv("MYMEMORY_SOURCE_LANG", "en").strip()
+    target = target_language.strip()
+
     try:
-        source = os.getenv("MYMEMORY_SOURCE_LANG", "en").strip()
-        target = target_language.strip()
-        r = requests.get(
-            "https://api.mymemory.translated.net/get",
-            params={"q": text, "langpair": f"{source}|{target}"},
-            timeout=60,
-        )
-        r.raise_for_status()
-        data = r.json()
-        translated = (data.get("responseData") or {}).get("translatedText")
-        if translated:
-            return translated
-        return str(data) if data else "Translation succeeded but response was empty."
+        chunks = _chunk_text(text)
+        translated_parts = []
+        for chunk in chunks:
+            if not chunk.strip():
+                continue
+            r = requests.get(
+                "https://api.mymemory.translated.net/get",
+                params={"q": chunk, "langpair": f"{source}|{target}"},
+                timeout=60,
+            )
+            r.raise_for_status()
+            data = r.json()
+            tr = (data.get("responseData") or {}).get("translatedText")
+            if tr:
+                translated_parts.append(tr)
+        return "\n".join(translated_parts) if translated_parts else "Translation returned empty."
     except Exception as e:
         prefix = "LibreTranslate failed" + (f" ({error})" if error else "")
         return f"{prefix}. MyMemory fallback also failed: {str(e)}"
