@@ -115,7 +115,6 @@ export default function App() {
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/not-authorized" element={<NotAuthorized />} />
-          <Route path="/" element={requireAuth(<Home user={user} />)} />
           <Route path="/*" element={requireAuth(<Home user={user} />)} />
         </Routes>
       </Layout>
