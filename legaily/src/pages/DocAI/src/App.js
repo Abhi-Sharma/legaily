@@ -1,6 +1,63 @@
 import React, { useState } from "react";
+import html2pdf from "html2pdf.js";
 import "./App.css";
 import { processFile, translateFile } from "./api";
+
+/** Turn plain API text into styled blocks: **bold**, lists, dividers. */
+function parseInlineBold(text) {
+  const parts = String(text).split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/);
+    if (m) return <strong key={i}>{m[1]}</strong>;
+    return <span key={i}>{part}</span>;
+  });
+}
+
+function renderFormattedOutput(text) {
+  if (!text) return null;
+  const lines = String(text).split("\n");
+  return lines.map((line, idx) => {
+    const key = `fmt-${idx}`;
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return <div key={key} className="docai-fmt-break" aria-hidden="true" />;
+    }
+    if (/^[-_=]{3,}$/.test(trimmed)) {
+      return <hr key={key} className="docai-fmt-divider" />;
+    }
+    if (/^##\s+/.test(trimmed)) {
+      return (
+        <h3 key={key} className="docai-fmt-heading">
+          {parseInlineBold(trimmed.replace(/^##\s+/, ""))}
+        </h3>
+      );
+    }
+    const subMatch = trimmed.match(/^\*\*([^*]+)\*\*:?\s*$/);
+    if (subMatch) {
+      return (
+        <h4 key={key} className="docai-fmt-subheading">
+          {subMatch[1]}
+        </h4>
+      );
+    }
+    const t = trimmed;
+    const isNumbered = /^\d+\.\s/.test(t);
+    const isBullet = /^[-•*]\s/.test(t);
+    let className = "docai-fmt-para";
+    if (isNumbered) className = "docai-fmt-numbered";
+    else if (isBullet) className = "docai-fmt-bullet";
+
+    const displayLine = isBullet
+      ? line.trimEnd().replace(/^[\s]*[-•*]\s/, "")
+      : line.trimEnd();
+
+    return (
+      <p key={key} className={className}>
+        {parseInlineBold(displayLine)}
+      </p>
+    );
+  });
+}
 
 const DocAIPage = () => {
   const [file, setFile] = useState(null);
@@ -51,6 +108,33 @@ const DocAIPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const downloadPDF = () => {
+    const element = document.getElementById("docaiPdfPreview");
+    if (!element || !result) return;
+
+    const actionLabel =
+      action === "translate"
+        ? `Translate_${targetLanguage}`
+        : "Summary";
+    const baseName = file
+      ? file.name.replace(/\.pdf$/i, "")
+      : "CaseFile";
+    const filename = `${baseName}_${actionLabel}.pdf`.replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    );
+
+    html2pdf()
+      .set({
+        margin: 0.75,
+        filename,
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+      })
+      .from(element)
+      .save();
   };
 
   return (
@@ -137,9 +221,44 @@ const DocAIPage = () => {
           )}
         </div>
         <div className="docai-output-window">
-          <div className="docai-output-title">Output</div>
-          <div className="docai-output-content white-space-pre-wrap">
-            {result ? result : <span>No output yet.</span>}
+          <div className="docai-output-title-row">
+            <div className="docai-output-title">Output</div>
+            {result ? (
+              <button
+                type="button"
+                className="docai-download-pdf"
+                onClick={downloadPDF}
+              >
+                Download as PDF
+              </button>
+            ) : null}
+          </div>
+          <div className="docai-output-content">
+            {!result && <span className="docai-output-empty">No output yet.</span>}
+            {result && (
+              <div id="docaiPdfPreview" className="docai-pdf-preview-box">
+                <h2 className="docai-pdf-heading">
+                  Legaily —{" "}
+                  {action === "translate"
+                    ? "Case file translation"
+                    : "Case file summary"}
+                </h2>
+                {action === "translate" && (
+                  <p className="docai-pdf-meta">
+                    Target language:{" "}
+                    {targetLanguage.charAt(0).toUpperCase() +
+                      targetLanguage.slice(1)}
+                  </p>
+                )}
+                {file && (
+                  <p className="docai-pdf-meta">Source file: {file.name}</p>
+                )}
+                <hr className="docai-pdf-rule" />
+                <div className="docai-pdf-body docai-formatted-root">
+                  {renderFormattedOutput(result)}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

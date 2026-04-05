@@ -5,6 +5,6 @@ pytesseract
 pdfplumber
 pillow
 cohere
-dotenv
+python-dotenv
 torch
 transformers

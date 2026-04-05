@@ -185,11 +185,37 @@
   height: 420px;
 }
 
+.docai-output-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
 .docai-output-title {
   font-weight: 700;
   font-size: 1.1rem;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   color: #222;
+}
+
+.docai-download-pdf {
+  background: #198754;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.docai-download-pdf:hover {
+  background: #157347;
 }
 
 .docai-output-content {
@@ -201,7 +227,110 @@
   overflow-y: auto;
   font-size: 1rem;
   color: #333;
-  white-space: pre-wrap;
+}
+
+.docai-output-empty {
+  color: #888;
+}
+
+.docai-pdf-preview-box {
+  background: #fff;
+  font-family: "Times New Roman", Times, serif;
+}
+
+.docai-pdf-heading {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  color: #111;
+}
+
+.docai-pdf-meta {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 4px 0;
+}
+
+.docai-pdf-rule {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 12px 0;
+}
+
+.docai-pdf-body {
+  font-size: 1rem;
+  color: #222;
+}
+
+.docai-formatted-root {
+  line-height: 1.65;
+}
+
+.docai-formatted-root p {
+  margin: 0;
+}
+
+.docai-fmt-break {
+  height: 0.55em;
+  min-height: 0.55em;
+}
+
+.docai-fmt-divider {
+  border: none;
+  border-top: 1px solid #d0d0d0;
+  margin: 1rem 0;
+}
+
+.docai-fmt-heading {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 1.1em 0 0.5em 0;
+  padding-bottom: 0.35em;
+  border-bottom: 2px solid var(--primary);
+}
+
+.docai-fmt-subheading {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #222;
+  margin: 1em 0 0.4em 0;
+  letter-spacing: 0.02em;
+}
+
+.docai-fmt-para {
+  margin: 0 0 0.65em 0;
+  line-height: 1.65;
+}
+
+.docai-fmt-numbered {
+  margin: 0.35em 0;
+  padding-left: 0.75em;
+  line-height: 1.65;
+  border-left: 3px solid rgba(244, 123, 32, 0.35);
+}
+
+.docai-fmt-bullet {
+  margin: 0.3em 0;
+  padding-left: 1.1em;
+  position: relative;
+  line-height: 1.65;
+}
+
+.docai-fmt-bullet::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.65em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.docai-formatted-root strong {
+  font-weight: 700;
+  color: #111;
 }
 
 @media (max-width: 900px) {
