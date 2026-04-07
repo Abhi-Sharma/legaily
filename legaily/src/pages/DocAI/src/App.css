@@ -238,6 +238,48 @@
   font-family: "Times New Roman", Times, serif;
 }
 
+.docai-pdf-paper {
+  background: #fff;
+  border: 1.5px solid #e6e6e6;
+  border-radius: 10px;
+  padding: 26px 26px 22px 26px;
+}
+
+.docai-pdf-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.docai-pdf-brand {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-size: 1.2rem;
+  color: #111;
+}
+
+.docai-pdf-tag {
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.docai-pdf-meta-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 6px 0 6px 0;
+}
+
+.docai-pdf-section-heading {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #111;
+  margin: 8px 0 10px 0;
+}
+
 .docai-pdf-heading {
   font-size: 1.15rem;
   font-weight: 700;

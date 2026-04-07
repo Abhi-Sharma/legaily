@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 
+const makeEntryId = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+
 const AdvDiary = () => {
   const [form, setForm] = useState({
     matterNumber: "",
@@ -12,12 +15,17 @@ const AdvDiary = () => {
 
   const [entries, setEntries] = useState(() => {
     const saved = localStorage.getItem("advDiaryEntries");
-    return saved ? JSON.parse(saved) : [];
+    const parsed = saved ? JSON.parse(saved) : [];
+    // Backfill ids for older saved entries
+    return Array.isArray(parsed)
+      ? parsed.map((e) => ({ id: e?.id || makeEntryId(), ...e }))
+      : [];
   });
 
   const [showPopup, setShowPopup] = useState(false);
   const [dialogEntries, setDialogEntries] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -42,7 +50,15 @@ const AdvDiary = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setEntries((prev) => [...prev, form]);
+    if (editingId) {
+      const updated = { id: editingId, ...form };
+      setEntries((prev) => prev.map((e) => (e.id === editingId ? updated : e)));
+      setDialogEntries((prev) => prev.map((e) => (e.id === editingId ? updated : e)));
+      setEditingId(null);
+    } else {
+      const newEntry = { id: makeEntryId(), ...form };
+      setEntries((prev) => [...prev, newEntry]);
+    }
     setShowPopup(true);
     setTimeout(() => setShowPopup(false), 2000);
     setForm({
@@ -53,6 +69,42 @@ const AdvDiary = () => {
       ampm: "AM",
       notes: ""
     });
+  };
+
+  const deleteEntryById = (id) => {
+    if (!id) return;
+    const ok = window.confirm("Delete this diary entry?");
+    if (!ok) return;
+
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+    setDialogEntries((prev) => prev.filter((e) => e.id !== id));
+    if (editingId === id) {
+      setEditingId(null);
+      setForm({
+        matterNumber: "",
+        partyName: "",
+        date: "",
+        time: "",
+        ampm: "AM",
+        notes: ""
+      });
+    }
+  };
+
+  const startEditEntry = (entry) => {
+    if (!entry?.id) return;
+    setEditingId(entry.id);
+    setDialogOpen(false);
+    setForm({
+      matterNumber: entry.matterNumber || "",
+      partyName: entry.partyName || "",
+      date: entry.date || "",
+      time: entry.time || "",
+      ampm: entry.ampm || "AM",
+      notes: entry.notes || ""
+    });
+    // scroll to form area
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const isHighlighted = (day) =>
@@ -192,7 +244,49 @@ const AdvDiary = () => {
         >
           <h3 style={{ color: "#d2691e", marginBottom: "0.5rem" }}>Entries for this date</h3>
           {dialogEntries.map((entry, idx) => (
-            <div key={idx} style={{ borderBottom: "1px solid #ddd", marginBottom: "1rem", paddingBottom: "0.5rem" }}>
+            <div key={entry.id || idx} style={{ borderBottom: "1px solid #ddd", marginBottom: "1rem", paddingBottom: "0.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+                <div style={{ fontWeight: 700, color: "#222" }}>
+                  {entry.partyName || "Entry"}
+                </div>
+                <div style={{ display: "flex", gap: "0.4rem", flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => startEditEntry(entry)}
+                    style={{
+                      background: "#0d6efd",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "0.25rem 0.6rem",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                    }}
+                    title="Edit entry"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteEntryById(entry.id)}
+                    style={{
+                      background: "#dc3545",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "0.25rem 0.6rem",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                    }}
+                    title="Delete entry"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
               <p><strong>Matter No:</strong> {entry.matterNumber}</p>
               <p><strong>Party:</strong> {entry.partyName}</p>
               <p><strong>Time:</strong> {entry.time} {entry.ampm}</p>
@@ -232,7 +326,9 @@ const AdvDiary = () => {
           }}
         >
           <h1 style={{ marginBottom: "0.3rem", fontSize: "1.3rem" }}>Lawyer's Diary</h1>
-          <h2 style={{ color: "#d2691e", marginBottom: "0.8rem", fontSize: "1rem" }}>Add New Entry</h2>
+          <h2 style={{ color: "#d2691e", marginBottom: "0.8rem", fontSize: "1rem" }}>
+            {editingId ? "Update Entry" : "Add New Entry"}
+          </h2>
           <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
             <input type="text" name="matterNumber" placeholder="Matter Number" value={form.matterNumber} onChange={handleChange} style={cleanInputStyle} />
             <input type="text" name="partyName" placeholder="Party Name" value={form.partyName} onChange={handleChange} style={cleanInputStyle} />
@@ -245,7 +341,9 @@ const AdvDiary = () => {
               </select>
             </div>
             <textarea name="notes" placeholder="Additional Notes" value={form.notes} onChange={handleChange} style={{ ...cleanInputStyle, height: "70px", resize: "none" }} />
-            <button type="submit" style={submitButtonStyle}>Add Entry</button>
+            <button type="submit" style={submitButtonStyle}>
+              {editingId ? "Update Entry" : "Add Entry"}
+            </button>
           </form>
         </div>
 

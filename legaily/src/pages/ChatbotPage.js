@@ -3,6 +3,66 @@ import React, { useEffect, useState, useRef } from 'react';
 
 const CHAT_API = 'http://localhost:8000/api/chat/';
 
+function parseInlineBold(text) {
+  const parts = String(text).split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/);
+    if (m) return <strong key={i}>{m[1]}</strong>;
+    return <span key={i}>{part}</span>;
+  });
+}
+
+function renderFormattedOutput(text) {
+  if (!text) return null;
+  const lines = String(text).split('\n');
+  return lines.map((line, idx) => {
+    const key = `chatfmt-${idx}`;
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={key} style={{ height: '0.55em' }} aria-hidden="true" />;
+    if (/^[-_=]{3,}$/.test(trimmed)) return <hr key={key} style={{ border: 'none', borderTop: '1px solid #e2e2e2', margin: '10px 0' }} />;
+    if (/^##\s+/.test(trimmed)) {
+      return (
+        <div key={key} style={{ fontWeight: 800, margin: '10px 0 6px 0' }}>
+          {parseInlineBold(trimmed.replace(/^##\s+/, ''))}
+        </div>
+      );
+    }
+    const sub = trimmed.match(/^\*\*([^*]+)\*\*:?\s*$/);
+    if (sub) return <div key={key} style={{ fontWeight: 800, margin: '10px 0 6px 0' }}>{sub[1]}</div>;
+    const isBullet = /^[-•*]\s/.test(trimmed);
+    const isNumbered = /^\d+\.\s/.test(trimmed);
+    const displayLine = isBullet ? line.replace(/^[\s]*[-•*]\s/, '') : line;
+    return (
+      <div
+        key={key}
+        style={{
+          margin: '0 0 6px 0',
+          paddingLeft: isBullet ? '12px' : isNumbered ? '10px' : 0,
+          borderLeft: isNumbered ? '3px solid rgba(255,140,0,0.35)' : 'none',
+          position: 'relative',
+        }}
+      >
+        {isBullet && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: '0.7em',
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: '#ff8c00',
+              transform: 'translateY(-50%)',
+            }}
+          />
+        )}
+        {parseInlineBold(displayLine)}
+      </div>
+    );
+  });
+}
+
 export default function ChatbotPage() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -138,11 +198,10 @@ export default function ChatbotPage() {
                 backgroundColor: m.role === 'user' ? '#ff8c00' : 'white',
                 color: m.role === 'user' ? 'white' : '#333',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
               }}
             >
-              {m.content}
+              {m.role === 'assistant' ? renderFormattedOutput(m.content) : m.content}
             </div>
           ))}
           {loading && (

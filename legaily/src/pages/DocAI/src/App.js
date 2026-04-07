@@ -237,25 +237,34 @@ const DocAIPage = () => {
             {!result && <span className="docai-output-empty">No output yet.</span>}
             {result && (
               <div id="docaiPdfPreview" className="docai-pdf-preview-box">
-                <h2 className="docai-pdf-heading">
-                  Legaily —{" "}
-                  {action === "translate"
-                    ? "Case file translation"
-                    : "Case file summary"}
-                </h2>
-                {action === "translate" && (
-                  <p className="docai-pdf-meta">
-                    Target language:{" "}
-                    {targetLanguage.charAt(0).toUpperCase() +
-                      targetLanguage.slice(1)}
-                  </p>
-                )}
-                {file && (
-                  <p className="docai-pdf-meta">Source file: {file.name}</p>
-                )}
-                <hr className="docai-pdf-rule" />
-                <div className="docai-pdf-body docai-formatted-root">
-                  {renderFormattedOutput(result)}
+                <div className="docai-pdf-paper">
+                  <div className="docai-pdf-header">
+                    <div className="docai-pdf-brand">Legaily</div>
+                    <div className="docai-pdf-tag">Legal AI Assistance</div>
+                  </div>
+
+                  <h2 className="docai-pdf-heading">
+                    {action === "translate" ? "Case File Translation" : "Case File Summary"}
+                  </h2>
+
+                  <div className="docai-pdf-meta-row">
+                    {file && <div className="docai-pdf-meta">Source: {file.name}</div>}
+                    {action === "translate" && (
+                      <div className="docai-pdf-meta">
+                        Target: {targetLanguage.charAt(0).toUpperCase() + targetLanguage.slice(1)}
+                      </div>
+                    )}
+                  </div>
+
+                  <hr className="docai-pdf-rule" />
+
+                  <div className="docai-pdf-section-heading">
+                    {action === "translate" ? "Translation" : "Summary"}
+                  </div>
+
+                  <div className="docai-pdf-body docai-formatted-root">
+                    {renderFormattedOutput(result)}
+                  </div>
                 </div>
               </div>
             )}

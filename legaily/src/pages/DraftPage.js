@@ -20,66 +20,157 @@ const fieldMap = {
 
 const templateTextMap = {
   'Legal Notice': `
-To,  
-[partyName]  
-[location]  
+LEGAL NOTICE
 
-Subject: Legal Notice regarding [caseDetails]
+Date: [date]
 
-Dear Sir/Madam,
+To,
+[partyName]
+[location]
 
-This is to formally notify you about the legal concern mentioned above. Please treat this matter with urgency.
+Subject: Legal Notice for [caseDetails]
 
-Sincerely,  
+Sir/Madam,
+
+Under instructions from and on behalf of my client, I hereby serve upon you the following legal notice:
+
+1. That my client is a law-abiding citizen and is engaged in lawful activities.
+2. That on / around __________ (date), you have __________ (acts of the opposite party) which has caused loss / injury to my client.
+3. That your above acts are illegal, arbitrary, and in violation of applicable laws.
+4. That despite repeated requests, you have failed to rectify the issue / comply with lawful demands.
+
+Therefore, you are hereby called upon to:
+
+- __________ (mention demands clearly)
+- Comply within ___ days from receipt of this notice
+
+Failing which, my client shall be constrained to initiate appropriate legal proceedings at your risk, cost, and consequences.
+
+Advocate
 [partyName]
 `,
   'Bail Application': `
-To,  
-The Hon’ble Court
+IN THE COURT OF __________
 
-Subject: Application for Bail
+BAIL APPLICATION NO. ____ OF 20__
 
-Respected Sir/Madam,
+IN THE MATTER OF:
 
-I, [partyName], hereby request the grant of bail in the matter of [caseDetails], registered at [location] on [date].
-
-Thank you,  
 [partyName]
+...Applicant
+
+VERSUS
+
+State of [location]
+...Respondent
+
+APPLICATION UNDER SECTION ____ CrPC FOR GRANT OF BAIL
+
+MOST RESPECTFULLY SHOWETH:
+
+1. That the applicant has been falsely implicated in the present case.
+2. That the applicant is innocent and has committed no offence.
+3. That the investigation is in progress / complete and the applicant is cooperating.
+4. That the applicant is not a flight risk and undertakes to appear as and when required.
+5. That no purpose will be served by further detention.
+
+Case / FIR details (as provided):
+[caseDetails]
+
+PRAYER:
+
+It is therefore most respectfully prayed that this Hon’ble Court may kindly grant bail to the applicant in the interest of justice.
+
+AND FOR THIS ACT OF KINDNESS, THE APPLICANT SHALL EVER PRAY.
+
+Place: [location]
+Date: [date]
+
+[Signature]
+Advocate / Applicant
 `,
   'Affidavit': `
 AFFIDAVIT
 
-I, [partyName], do hereby solemnly affirm that:
+I, [partyName], S/o / D/o __________, aged __ years, residing at [location], do hereby solemnly affirm and state:
 
-1. I am residing in [location].
-2. The facts related to [caseDetails] are true to the best of my knowledge.
+1. That I am the deponent herein.
+2. That I am fully aware of the facts of this affidavit.
+3. That the statements made herein are true and correct to my knowledge and belief.
+4. That nothing material has been concealed.
 
-Dated: [date]  
-[partyName]
+DEPONENT
+
+VERIFICATION:
+
+Verified at [location] on this [date] day of __________ 20__ that the contents are true and correct.
+
+DEPONENT
 `,
   'Contract': `
-CONTRACT AGREEMENT
+AGREEMENT
 
-This agreement is made on [date] between [partyName] and [otherParty] regarding [caseDetails].
+This Agreement is made on this [date] between:
 
-Both parties agree to the terms stated hereafter. This agreement is effective from the date mentioned and is enforceable by law.
+[partyName], residing at [location] (hereinafter referred to as "First Party")
 
-Location: [location]
+AND
 
-Signed,  
-[partyName]  
-[otherParty]
+[otherParty], residing at __________ (hereinafter referred to as "Second Party")
+
+WHEREAS:
+
+- The First Party agrees to [caseDetails]
+- The Second Party agrees to __________
+
+TERMS & CONDITIONS:
+
+1. That the agreement shall be valid for ___ duration.
+2. That consideration amount is Rs. ________.
+3. That both parties agree to fulfill obligations in good faith.
+4. That any dispute shall be subject to jurisdiction of __________ courts.
+
+IN WITNESS WHEREOF both parties have signed this agreement.
+
+First Party Signature: __________
+Second Party Signature: __________
 `,
   'PIL (Public Interest Litigation)': `
-PUBLIC INTEREST LITIGATION
+IN THE HON’BLE HIGH COURT OF __________
 
-Filed by: [partyName]  
-Location: [location]  
+WRIT PETITION (PIL) NO. ___ OF 20__
+
+IN THE MATTER OF:
+
+[partyName]
+...Petitioner
+
+VERSUS
+
+State of [location] & Others
+...Respondents
+
+PUBLIC INTEREST LITIGATION UNDER ARTICLE 226 OF THE CONSTITUTION
+
+MOST RESPECTFULLY SHOWETH:
+
+1. That the present petition is filed in public interest.
+2. That the issue concerns [caseDetails] affecting the public at large.
+3. That the respondents have failed to perform their duties.
+4. That no alternative remedy is available.
+
+PRAYER:
+
+It is therefore prayed that this Hon’ble Court may kindly:
+
+- Issue appropriate writ/order/direction
+- Grant any other relief deemed fit
+
+Place: [location]
 Date: [date]
 
-Subject: [caseDetails]
-
-This PIL is submitted in the interest of public welfare in accordance with Article 32 of the Indian Constitution.
+[Signature]
+Petitioner
 `
 };
 
@@ -94,6 +185,21 @@ const Drafts = () => {
   });
   const [draftOutput, setDraftOutput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const initialFormState = {
+    partyName: '',
+    location: '',
+    otherParty: '',
+    caseDetails: '',
+    date: ''
+  };
+
+  const handleTemplateChange = (e) => {
+    const nextTemplate = e.target.value;
+    setSelectedTemplate(nextTemplate);
+    setDraftOutput('');
+    setIsLoading(false);
+    setFormData(initialFormState);
+  };
 
   const handleGenerateDraft = () => {
     setIsLoading(true);
@@ -106,8 +212,7 @@ const Drafts = () => {
         .replaceAll('[caseDetails]', formData.caseDetails.trim())
         .replaceAll('[date]', formData.date);
 
-      const finalDraft = `📄 Draft: ${selectedTemplate}\n\n${filledTemplate}`;
-      setDraftOutput(finalDraft);
+      setDraftOutput(filledTemplate.trim());
       setIsLoading(false);
     }, 1000);
   };
@@ -126,6 +231,14 @@ const Drafts = () => {
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     }).from(element).save();
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(draftOutput || '');
+    } catch {
+      // no-op (clipboard can fail on insecure contexts)
+    }
   };
 
   const renderInput = (field) => {
@@ -171,7 +284,7 @@ const Drafts = () => {
 
       <div className="form-group">
         <label>Select Template</label>
-        <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
+        <select value={selectedTemplate} onChange={handleTemplateChange}>
           <option value="">-- Choose Template --</option>
           {templates.map((template, idx) => (
             <option key={idx} value={template}>{template}</option>
@@ -191,9 +304,37 @@ const Drafts = () => {
 
       {draftOutput && (
         <>
-          <div id="draftPreview" className="preview-box" contentEditable suppressContentEditableWarning>
-            {draftOutput}
+          <div id="draftPreview" className="draft-template-page">
+            <div className="draft-template-topbar">
+              <div className="draft-template-date">
+                {new Date().toLocaleString()}
+              </div>
+              <div className="draft-template-title">Court Draft Templates</div>
+              <div className="draft-template-spacer" />
+            </div>
+
+            <div className="draft-template-section-title">
+              <span className="draft-template-section-icon" aria-hidden="true">📄</span>
+              <span className="draft-template-section-number">1.</span>
+              <span className="draft-template-section-name">{selectedTemplate} Template</span>
+            </div>
+
+            <div className="draft-template-card">
+              <div className="draft-template-card-header">
+                <span className="draft-template-card-header-left">Writing</span>
+                <button
+                  type="button"
+                  className="draft-template-copy-btn"
+                  onClick={copyToClipboard}
+                  title="Copy"
+                >
+                  ⧉
+                </button>
+              </div>
+              <pre className="draft-template-content">{draftOutput}</pre>
+            </div>
           </div>
+
           <button className="download-btn" onClick={downloadPDF}>Download as PDF</button>
         </>
       )}
