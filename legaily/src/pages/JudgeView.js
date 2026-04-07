@@ -10,9 +10,10 @@ export default function JudgeView() {
   const [selectedEmail, setSelectedEmail] = useState("");
 
   const [lawyers, setLawyers] = useState([
-    { name: "Kanishka", email: "kanish12ka@gmail.com" },
-    { name: "Arun", email: "arun@gmail.com" },
-    { name: "Anuj", email: "anuj123@gmail.com" },
+    { name: "Anmol", email: "anmolgupta1478@gmail.com" },
+    { name: "Abhi Sharma", email: "abhisharma.rediffmail@gmail.com" },
+    { name: "Aaditya Raj Joshi", email: "aadityarajj3210@gmail.com" },
+    { name: "Bhavesh Khandelwal", email: "bhaveshkhandelwal1232@gmail.com" },
   ]);
 
   const [showDialog, setShowDialog] = useState(false);

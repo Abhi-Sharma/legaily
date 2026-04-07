@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import "./Login.css";
 
 export default function Login({ onLogin }) {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const mainOrange = "#ff7a1a";
@@ -16,7 +16,7 @@ export default function Login({ onLogin }) {
       const response = await fetch("http://localhost:5001/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       const data = await response.json();
@@ -124,13 +124,15 @@ export default function Login({ onLogin }) {
         <h2 style={{ color: mainOrange, marginBottom: 24, fontSize: "1.4rem" }}>Welcome back</h2>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", marginBottom: 6, color: "#333", fontWeight: 500 }}>Email</label>
+          <label style={{ display: "block", marginBottom: 6, color: "#333", fontWeight: 500 }}>
+            Username or Email
+          </label>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
-            placeholder="your@email.com"
+            placeholder="Enter username or email"
             style={{
               width: "100%",
               padding: 12,
