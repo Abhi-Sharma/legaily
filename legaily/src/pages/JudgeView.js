@@ -20,10 +20,10 @@ export default function JudgeView() {
   const [newLawyerName, setNewLawyerName] = useState("");
   const [newLawyerEmail, setNewLawyerEmail] = useState("");
 
-  const pinataApiKey = "87ae79a4ac4567f97885";
-  const pinataApiSecret = "2b72ef2516a7cc4dfc31e8ae475698011492a909ad95fe1f40dbc35f1b11fc24";
-  const pinataJWT = "YOUR_PINATA_JWT";
-  const useJWT = false;
+  const pinataApiKey = "09203ef613cc4c1445d7";
+  const pinataApiSecret = "ead3ac6efd94087055317ead0d41acc8e397b562377053bf2fdafb5214a3c4a5";
+  const pinataJWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiJlMDQzODNkNy0yYzNjLTRkNzQtYmY1MC00NDY0ZDhlYTY0MzYiLCJlbWFpbCI6ImFubW9sZ3VwdGExNDc4QGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiIwOTIwM2VmNjEzY2M0YzE0NDVkNyIsInNjb3BlZEtleVNlY3JldCI6ImVhZDNhYzZlZmQ5NDA4NzA1NTMxN2VhZDBkNDFhY2M4ZTM5N2I1NjIzNzcwNTNiZjJmZGFmYjUyMTRhM2M0YTUiLCJleHAiOjE4MDcxMDI5NDJ9.HTWoPXC-FFtc8-woHchhuw-UHi5po2o9wvz7J-rEwqY";
+  const useJWT = true;
 
   useEffect(() => {
     setUserRole(localStorage.getItem("role"));
