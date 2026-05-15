@@ -26,3 +26,13 @@ export const translateFile = async (file, targetLanguage) => {
 
   return response.data;
 };
+
+export const askSummaryQuestion = async (summaryText, question, history = []) => {
+  const response = await axios.post(`${BASE_URL}/qa_summary/`, {
+    summary_text: summaryText,
+    question: question,
+    history: history,
+  });
+
+  return response.data;
+};

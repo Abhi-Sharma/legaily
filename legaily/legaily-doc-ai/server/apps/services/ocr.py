@@ -21,9 +21,24 @@ async def extract_text(file):
     
     # Process based on file type
     if file_extension == 'pdf':
-        # Use pdfplumber for PDFs
+        # Use pdfplumber for PDFs with a hybrid OCR fallback
+        extracted_pages = []
         with pdfplumber.open(io.BytesIO(content)) as pdf:
-            return "\n".join(p.extract_text() or '' for p in pdf.pages)
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                
+                # Heuristic: If page text is very short/empty, it's likely a scan
+                if not page_text or len(page_text.strip()) < 50:
+                    try:
+                        # Convert page to image and OCR it
+                        img = page.to_image(resolution=200).original
+                        page_text = pytesseract.image_to_string(img)
+                    except Exception as e:
+                        print(f"OCR fallback failed for a page: {e}")
+                        
+                extracted_pages.append(page_text or "")
+        
+        return "\n".join(extracted_pages)
     
     elif file_extension in ['jpg', 'jpeg', 'png']:
         # Use pytesseract for images

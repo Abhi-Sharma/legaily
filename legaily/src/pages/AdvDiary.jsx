@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
+import "./AdvDiary.css";
 
-const makeEntryId = () =>
-  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+const API_BASE = "http://localhost:5001/api/diary";
 
 const AdvDiary = () => {
   const [form, setForm] = useState({
-    matterNumber: "",
+    caseNumber: "",
     partyName: "",
     date: "",
     time: "",
@@ -13,19 +13,12 @@ const AdvDiary = () => {
     notes: ""
   });
 
-  const [entries, setEntries] = useState(() => {
-    const saved = localStorage.getItem("advDiaryEntries");
-    const parsed = saved ? JSON.parse(saved) : [];
-    // Backfill ids for older saved entries
-    return Array.isArray(parsed)
-      ? parsed.map((e) => ({ id: e?.id || makeEntryId(), ...e }))
-      : [];
-  });
-
+  const [entries, setEntries] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
   const [dialogEntries, setDialogEntries] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [viewingDoc, setViewingDoc] = useState(null);
 
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -33,12 +26,29 @@ const AdvDiary = () => {
 
   useEffect(() => {
     document.body.style.margin = 0;
-    document.body.style.overflow = "hidden";
+    document.body.style.backgroundColor = "#fff8f0";
+    fetchEntries();
+    return () => {
+      document.body.style.backgroundColor = "";
+    };
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("advDiaryEntries", JSON.stringify(entries));
-  }, [entries]);
+  const fetchEntries = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const res = await fetch(`${API_BASE}/all`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Format to map _id to id for backwards UI compatibility
+        setEntries(data.map(e => ({ ...e, id: e._id })));
+      }
+    } catch (err) {
+      console.error("Failed to fetch diary entries:", err);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -48,46 +58,111 @@ const AdvDiary = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingId) {
-      const updated = { id: editingId, ...form };
-      setEntries((prev) => prev.map((e) => (e.id === editingId ? updated : e)));
-      setDialogEntries((prev) => prev.map((e) => (e.id === editingId ? updated : e)));
-      setEditingId(null);
-    } else {
-      const newEntry = { id: makeEntryId(), ...form };
-      setEntries((prev) => [...prev, newEntry]);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please login first.");
+      return;
     }
-    setShowPopup(true);
-    setTimeout(() => setShowPopup(false), 2000);
-    setForm({
-      matterNumber: "",
-      partyName: "",
-      date: "",
-      time: "",
-      ampm: "AM",
-      notes: ""
-    });
+
+    try {
+      if (editingId) {
+        const res = await fetch(`${API_BASE}/update/${editingId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify(form)
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          // Map _id -> id
+          const fmtUpdated = { ...updated, id: updated._id };
+          setEntries((prev) => prev.map((en) => (en.id === editingId ? fmtUpdated : en)));
+          setDialogEntries((prev) => prev.map((en) => (en.id === editingId ? fmtUpdated : en)));
+          setEditingId(null);
+          
+          setShowPopup(true);
+          setTimeout(() => setShowPopup(false), 2500);
+          setForm({
+            caseNumber: "",
+            partyName: "",
+            date: "",
+            time: "",
+            ampm: "AM",
+            notes: ""
+          });
+        } else {
+          const errorData = await res.json();
+          alert(`Failed to update: ${errorData.message || res.statusText}`);
+        }
+      } else {
+        const res = await fetch(`${API_BASE}/create`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify(form)
+        });
+        if (res.ok) {
+          const newEntry = await res.json();
+          setEntries((prev) => [...prev, { ...newEntry, id: newEntry._id }]);
+          
+          setShowPopup(true);
+          setTimeout(() => setShowPopup(false), 2500);
+          setForm({
+            caseNumber: "",
+            partyName: "",
+            date: "",
+            time: "",
+            ampm: "AM",
+            notes: ""
+          });
+        } else {
+          const errorData = await res.json();
+          alert(`Failed to create: ${errorData.message || res.statusText}`);
+        }
+      }
+    } catch (err) {
+      console.error("Submit error:", err);
+      alert("Failed to save entry.");
+    }
   };
 
-  const deleteEntryById = (id) => {
+  const deleteEntryById = async (id) => {
     if (!id) return;
-    const ok = window.confirm("Delete this diary entry?");
+    const ok = window.confirm("Are you sure you want to delete this diary entry?");
     if (!ok) return;
 
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-    setDialogEntries((prev) => prev.filter((e) => e.id !== id));
-    if (editingId === id) {
-      setEditingId(null);
-      setForm({
-        matterNumber: "",
-        partyName: "",
-        date: "",
-        time: "",
-        ampm: "AM",
-        notes: ""
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/delete/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
       });
+      if (res.ok) {
+        setEntries((prev) => prev.filter((e) => e.id !== id));
+        setDialogEntries((prev) => prev.filter((e) => e.id !== id));
+        if (editingId === id) {
+          setEditingId(null);
+          setForm({
+            caseNumber: "",
+            partyName: "",
+            date: "",
+            time: "",
+            ampm: "AM",
+            notes: ""
+          });
+        }
+        if (dialogEntries.length <= 1) {
+          setDialogOpen(false);
+        }
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
     }
   };
 
@@ -95,35 +170,44 @@ const AdvDiary = () => {
     if (!entry?.id) return;
     setEditingId(entry.id);
     setDialogOpen(false);
+    
+    // Convert UTC Date back to YYYY-MM-DD for the input 
+    let formattedDate = entry.date;
+    if (formattedDate && formattedDate.includes('T')) {
+       formattedDate = formattedDate.split('T')[0];
+    }
+    
     setForm({
-      matterNumber: entry.matterNumber || "",
+      caseNumber: entry.caseNumber || entry.matterNumber || "",
       partyName: entry.partyName || "",
-      date: entry.date || "",
+      date: formattedDate || "",
       time: entry.time || "",
       ampm: entry.ampm || "AM",
       notes: entry.notes || ""
     });
-    // scroll to form area
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const isHighlighted = (day) =>
-    entries.some((entry) => {
-      const date = new Date(entry.date);
-      return (
-        date.getDate() === day &&
-        date.getMonth() === currentMonth &&
-        date.getFullYear() === currentYear
-      );
-    });
-
   const getEntriesByDate = (day) => {
     return entries.filter((entry) => {
-      const date = new Date(entry.date);
+      if (!entry.date) return false;
+      let entryDateStr = entry.date;
+      if (entryDateStr && entryDateStr.includes('T')) {
+        entryDateStr = entryDateStr.split('T')[0]; 
+      }
+      
+      // Parse YYYY-MM-DD exactly to avoid timezone conversion bugs when rendering
+      const parts = entryDateStr.split('-');
+      if (parts.length !== 3) return false;
+      
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1; // Month is 0-indexed in UI currentMonth
+      const d = parseInt(parts[2], 10);
+      
       return (
-        date.getDate() === day &&
-        date.getMonth() === currentMonth &&
-        date.getFullYear() === currentYear
+        d === day &&
+        m === currentMonth &&
+        y === currentYear
       );
     });
   };
@@ -138,302 +222,281 @@ const AdvDiary = () => {
     const days = [];
     const totalDays = daysInMonth(currentMonth, currentYear);
     const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
+    const totalCells = Math.ceil((totalDays + firstDay) / 7) * 7;
     let dayCounter = 1;
 
-    for (let i = 0; i < 6; i++) {
-      const week = [];
-      for (let j = 0; j < 7; j++) {
-        if ((i === 0 && j < firstDay) || dayCounter > totalDays) {
-          week.push(<td key={j}></td>);
-        } else {
-          const highlight = isHighlighted(dayCounter);
-          const dayEntries = getEntriesByDate(dayCounter);
-          const tooltip = dayEntries.map(e => e.partyName).join(", ");
-          week.push(
-            <td
-              key={j}
-              title={tooltip}
-              onClick={() => {
-                if (dayEntries.length > 0) {
-                  setDialogEntries(dayEntries);
-                  setDialogOpen(true);
-                }
-              }}
-              style={{
-                padding: "14px",
-                backgroundColor: highlight ? "#fde4b7" : "#fff",
-                border: "1px solid #ddd",
-                borderRadius: "4px",
-                fontWeight: highlight ? "bold" : "normal",
-                textAlign: "center",
-                cursor: highlight ? "pointer" : "default",
-                fontSize: "0.85rem",
-              }}
-            >
-              <>
-                {dayCounter}
-                {highlight && (
-                  <div
-                    style={{
-                      marginTop: 4,
-                      background: "#ffbb73",
-                      color: "#222",
-                      fontSize: "0.65rem",
-                      borderRadius: "4px",
-                      padding: "2px 4px",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {tooltip}
-                  </div>
-                )}
-              </>
-            </td>
-          );
-          dayCounter++;
-        }
+    for (let i = 0; i < totalCells; i++) {
+      if (i < firstDay || dayCounter > totalDays) {
+        days.push(<div key={`empty-${i}`} className="adv-day empty"></div>);
+      } else {
+        const todayEntries = getEntriesByDate(dayCounter);
+        const hasEntries = todayEntries.length > 0;
+        const currentDay = dayCounter;
+
+        days.push(
+          <div
+            key={currentDay}
+            className={`adv-day ${hasEntries ? "has-entries" : ""}`}
+            onClick={() => {
+              if (hasEntries) {
+                setDialogEntries(todayEntries);
+                setDialogOpen(true);
+              }
+            }}
+          >
+            <span className="adv-day-number">{currentDay}</span>
+            {hasEntries && (
+              <div className="adv-entry-badge">
+                {todayEntries.length} {todayEntries.length === 1 ? 'Entry' : 'Entries'}
+              </div>
+            )}
+          </div>
+        );
+        dayCounter++;
       }
-      days.push(<tr key={i}>{week}</tr>);
     }
     return days;
   };
 
   return (
     <>
-      {/* Entry Added Popup */}
-      {showPopup && (
-        <div
-          style={{
-            position: "fixed",
-            top: "20px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "#d2691e",
-            color: "white",
-            padding: "10px 20px",
-            borderRadius: "8px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-            zIndex: 9999,
-            fontWeight: "500",
-            fontSize: "1rem",
-          }}
-        >
-          Entry added successfully!
-        </div>
-      )}
-
-      {/* Dialog Box for Viewing Entries */}
-      {dialogOpen && (
-        <div
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            background: "#fff",
-            padding: "1rem 1.5rem",
-            borderRadius: "12px",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
-            zIndex: 9999,
-            width: "400px",
-            maxHeight: "80vh",
-            overflowY: "auto",
-          }}
-        >
-          <h3 style={{ color: "#d2691e", marginBottom: "0.5rem" }}>Entries for this date</h3>
-          {dialogEntries.map((entry, idx) => (
-            <div key={entry.id || idx} style={{ borderBottom: "1px solid #ddd", marginBottom: "1rem", paddingBottom: "0.5rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
-                <div style={{ fontWeight: 700, color: "#222" }}>
-                  {entry.partyName || "Entry"}
-                </div>
-                <div style={{ display: "flex", gap: "0.4rem", flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => startEditEntry(entry)}
-                    style={{
-                      background: "#0d6efd",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "0.25rem 0.6rem",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: 700,
+      <div className="adv-diary-page">
+        {/* Entry Form Card */}
+        <div className="adv-card adv-form-card">
+          <div className="adv-header">
+            <span>🖋️ Diary Entry</span>
+          </div>
+          <form onSubmit={handleSubmit} className="adv-form">
+            <div className="adv-input-group">
+              <label>Case Number</label>
+              <input
+                type="text"
+                name="caseNumber"
+                placeholder="e.g. CR-2023-104"
+                value={form.caseNumber}
+                onChange={handleChange}
+                className="adv-input"
+              />
+            </div>
+            <div className="adv-input-group">
+              <label>Party Name</label>
+              <input
+                type="text"
+                name="partyName"
+                placeholder="Client or Opposing Party"
+                value={form.partyName}
+                onChange={handleChange}
+                className="adv-input"
+                required
+              />
+            </div>
+            <div className="adv-input-group">
+              <label>Date</label>
+              <input
+                type="date"
+                name="date"
+                value={form.date}
+                onChange={handleChange}
+                className="adv-input"
+                required
+              />
+            </div>
+            <div className="adv-row">
+              <div className="adv-input-group" style={{ flex: 2 }}>
+                <label>Time</label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <select
+                    className="adv-input adv-select"
+                    style={{ padding: "12px", backgroundPosition: "calc(100% - 8px) center" }}
+                    value={form.time.split(':')[0] || '12'}
+                    onChange={(e) => {
+                      const min = form.time.split(':')[1] || '00';
+                      handleChange({ target: { name: 'time', value: `${e.target.value}:${min}` } });
                     }}
-                    title="Edit entry"
                   >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteEntryById(entry.id)}
-                    style={{
-                      background: "#dc3545",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "0.25rem 0.6rem",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: 700,
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const h = String(i + 1).padStart(2, '0');
+                      return <option key={h} value={h}>{h}</option>;
+                    })}
+                  </select>
+                  <span style={{ fontWeight: 800 }}>:</span>
+                  <select
+                    className="adv-input adv-select"
+                    style={{ padding: "12px", backgroundPosition: "calc(100% - 8px) center" }}
+                    value={form.time.split(':')[1] || '00'}
+                    onChange={(e) => {
+                      const hr = form.time.split(':')[0] || '12';
+                      handleChange({ target: { name: 'time', value: `${hr}:${e.target.value}` } });
                     }}
-                    title="Delete entry"
                   >
-                    Delete
-                  </button>
+                    {Array.from({ length: 60 }, (_, i) => {
+                      const m = String(i).padStart(2, '0');
+                      return <option key={m} value={m}>{m}</option>;
+                    })}
+                  </select>
                 </div>
               </div>
-
-              <p><strong>Matter No:</strong> {entry.matterNumber}</p>
-              <p><strong>Party:</strong> {entry.partyName}</p>
-              <p><strong>Time:</strong> {entry.time} {entry.ampm}</p>
-              <p><strong>Notes:</strong> {entry.notes}</p>
+              <div className="adv-input-group" style={{ flex: 1 }}>
+                <label>AM/PM</label>
+                <select
+                  name="ampm"
+                  value={form.ampm}
+                  onChange={handleChange}
+                  className="adv-input adv-select"
+                >
+                  <option>AM</option>
+                  <option>PM</option>
+                </select>
+              </div>
             </div>
-          ))}
-          <button onClick={() => setDialogOpen(false)} style={{ ...submitButtonStyle, width: "100%" }}>
-            Close
-          </button>
-        </div>
-      )}
-
-      {/* Layout */}
-      <div
-        style={{
-          display: "flex",
-          height: "100vh",
-          padding: "1rem",
-          gap: "1rem",
-          background: "#f8f9fa",
-          fontSize: "0.88rem",
-          boxSizing: "border-box",
-          overflow: "hidden",
-        }}
-      >
-        {/* Entry Form */}
-        <div
-          style={{
-            flex: 1,
-            padding: "1rem",
-            background: "#fff",
-            borderRadius: "12px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          <h1 style={{ marginBottom: "0.3rem", fontSize: "1.3rem" }}>Lawyer's Diary</h1>
-          <h2 style={{ color: "#d2691e", marginBottom: "0.8rem", fontSize: "1rem" }}>
-            {editingId ? "Update Entry" : "Add New Entry"}
-          </h2>
-          <form onSubmit={handleSubmit} style={{ flexGrow: 1 }}>
-            <input type="text" name="matterNumber" placeholder="Matter Number" value={form.matterNumber} onChange={handleChange} style={cleanInputStyle} />
-            <input type="text" name="partyName" placeholder="Party Name" value={form.partyName} onChange={handleChange} style={cleanInputStyle} />
-            <input type="date" name="date" value={form.date} onChange={handleChange} style={cleanInputStyle} />
-            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.8rem" }}>
-              <input type="time" name="time" value={form.time} onChange={handleChange} style={{ ...cleanInputStyle, flex: 1 }} />
-              <select name="ampm" value={form.ampm} onChange={handleChange} style={{ ...cleanInputStyle, flex: 0.5 }}>
-                <option>AM</option>
-                <option>PM</option>
-              </select>
+            <div className="adv-input-group">
+              <label>Notes</label>
+              <textarea
+                name="notes"
+                placeholder="Hearing details, next steps..."
+                value={form.notes}
+                onChange={handleChange}
+                className="adv-input"
+              />
             </div>
-            <textarea name="notes" placeholder="Additional Notes" value={form.notes} onChange={handleChange} style={{ ...cleanInputStyle, height: "70px", resize: "none" }} />
-            <button type="submit" style={submitButtonStyle}>
-              {editingId ? "Update Entry" : "Add Entry"}
+            <button type="submit" className="adv-btn">
+              {editingId ? "Update Entry" : "Save Entry"}
             </button>
           </form>
         </div>
 
-        {/* Calendar View */}
-        <div
-          style={{
-            flex: 1.5,
-            display: "flex",
-            flexDirection: "column",
-            padding: "1rem",
-            background: "#fff",
-            borderRadius: "12px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-            <h2 style={{ color: "#d2691e", fontSize: "1rem" }}>Calendar</h2>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <select value={currentMonth} onChange={handleMonthChange} style={{ ...cleanInputStyle, padding: "0.4rem" }}>
+        {/* Calendar Card */}
+        <div className="adv-card adv-calendar-card">
+          <div className="adv-header">
+            <span>📅 Schedule</span>
+            <div className="adv-toolbar">
+              <select value={currentMonth} onChange={handleMonthChange} className="adv-select">
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i} value={i}>
-                    {new Date(0, i).toLocaleString("default", { month: "short" })}
+                    {new Date(0, i).toLocaleString("default", { month: "long" })}
                   </option>
                 ))}
               </select>
-              <select value={currentYear} onChange={handleYearChange} style={{ ...cleanInputStyle, padding: "0.4rem" }}>
-                {Array.from({ length: 20 }, (_, i) => {
-                  const year = new Date().getFullYear() - 10 + i;
+              <select value={currentYear} onChange={handleYearChange} className="adv-select">
+                {Array.from({ length: 10 }, (_, i) => {
+                  const year = today.getFullYear() - 5 + i;
                   return <option key={year} value={year}>{year}</option>;
                 })}
               </select>
             </div>
           </div>
 
-          <div style={{ flexGrow: 1 }}>
-            <table
-              style={{
-                width: "100%",
-                height: "85%",
-                borderCollapse: "collapse",
-                tableLayout: "fixed",
-                fontSize: "0.85rem",
-              }}
-            >
-              <thead>
-                <tr>
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                    <th
-                      key={day}
-                      style={{
-                        padding: "8px",
-                        backgroundColor: "#ffefe0",
-                        border: "1px solid #f0c99c",
-                        fontWeight: "600",
-                      }}
-                    >
-                      {day}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>{renderCalendar()}</tbody>
-            </table>
+          <div className="adv-calendar">
+            <div className="adv-weekdays">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <div key={day} className="adv-weekday">{day}</div>
+              ))}
+            </div>
+            <div className="adv-days-grid">
+              {renderCalendar()}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Popups and Modals */}
+      {showPopup && (
+        <div className="adv-toast">
+          ✓ Entry successfully saved!
+        </div>
+      )}
+
+      {dialogOpen && (
+        <div className="adv-overlay" onClick={() => setDialogOpen(false)}>
+          <div className="adv-dialog" onClick={e => e.stopPropagation()}>
+            <div className="adv-dialog-header">
+              <span>Selected Entries</span>
+              <button className="adv-dialog-close" onClick={() => setDialogOpen(false)}>×</button>
+            </div>
+            <div className="adv-dialog-content">
+              {dialogEntries.map((entry, idx) => (
+                <div key={entry.id || idx} className="adv-entry-card">
+                  <div className="adv-entry-header">
+                    <span className="adv-entry-title">{entry.partyName || "Unnamed Entry"}</span>
+                    <div className="adv-entry-actions">
+                      <button className="adv-btn-small adv-btn-edit" onClick={() => startEditEntry(entry)}>
+                        Edit
+                      </button>
+                      <button className="adv-btn-small adv-btn-delete" onClick={() => deleteEntryById(entry.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                  <div className="adv-entry-detail"><strong>Case No:</strong> {entry.caseNumber || "N/A"}</div>
+                  <div className="adv-entry-detail">
+                    <strong>Time:</strong> {entry.time ? `${entry.time} ${entry.ampm}` : "Not specified"}
+                  </div>
+                  {entry.notes && (
+                    <div className="adv-entry-detail" style={{ marginTop: '8px', padding: '8px', background: '#fff', borderRadius: '8px', border: '1px solid #eee' }}>
+                      {entry.notes}
+                    </div>
+                  )}
+
+                  {/* Render Linked Documents if they exist */}
+                  {entry.linkedDocuments && entry.linkedDocuments.length > 0 && (
+                     <div style={{ marginTop: '12px', padding: '12px', background: '#fffcf0', borderRadius: '8px', border: '1px dashed #ff8c00' }}>
+                       <strong style={{ color: '#ff7a1a', display: 'block', marginBottom: '8px', fontSize: '0.85rem', textTransform: 'uppercase' }}>
+                         Linked Documents
+                       </strong>
+                       {entry.linkedDocuments.map(doc => {
+                         const getDocIcon = (type) => {
+                           if (type === 'SUMMARY') return '📑';
+                           if (type === 'TRANSLATION') return '🌐';
+                           return '📄'; // Default/Draft
+                         };
+                         
+                         const docTypeLabel = doc.type === 'SUMMARY' ? 'Summary' : doc.type === 'TRANSLATION' ? 'Translation' : 'Draft';
+                         
+                         return (
+                           <div 
+                             key={doc._id} 
+                             onClick={() => setViewingDoc(doc)}
+                             style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', transition: 'background 0.2s', border: '1px solid transparent' }}
+                             onMouseOver={e => { e.currentTarget.style.background = 'rgba(255, 140, 0, 0.1)'; e.currentTarget.style.borderColor = 'rgba(255, 140, 0, 0.3)'; }}
+                             onMouseOut={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
+                             title={`Open ${docTypeLabel} Document`}
+                           >
+                             <span style={{ fontSize: '1.1rem' }}>{getDocIcon(doc.type)}</span>
+                             <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#ff7a1a', textDecoration: 'underline', flexGrow: 1 }}>{doc.title}</span>
+                             <span style={{ fontSize: '0.7rem', padding: '2px 6px', background: 'rgba(255,140,0,0.1)', color: '#ff7a1a', borderRadius: '12px', fontWeight: 'bold' }}>
+                               {docTypeLabel}
+                             </span>
+                           </div>
+                         );
+                       })}
+                     </div>
+                  )}
+
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Viewing Modal */}
+      {viewingDoc && (
+        <div className="adv-overlay" onClick={() => setViewingDoc(null)} style={{ zIndex: 10001 }}>
+          <div className="adv-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', height: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="adv-dialog-header" style={{ background: '#2c3e50', color: 'white' }}>
+              <span>📄 Document: {viewingDoc.title}</span>
+              <button className="adv-dialog-close" onClick={() => setViewingDoc(null)} style={{ color: 'white' }}>×</button>
+            </div>
+            <div className="adv-dialog-content" style={{ flexGrow: 1, overflowY: 'auto', background: '#f8fafc', padding: '24px' }}>
+              <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'serif', fontSize: '1.05rem', lineHeight: '1.6', color: '#1a1a1a', background: 'white', padding: '40px 30px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', border: '1px solid #e2e8f0', margin: 0 }}>
+                {viewingDoc.content}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
-};
-
-const cleanInputStyle = {
-  width: "100%",
-  padding: "0.45rem 0.5rem",
-  marginBottom: "0.7rem",
-  border: "none",
-  borderBottom: "1px solid #ccc",
-  backgroundColor: "#fdfdfd",
-  fontSize: "1rem",
-};
-
-const submitButtonStyle = {
-  background: "#d2691e",
-  color: "#fff",
-  padding: "0.45rem 1rem",
-  border: "none",
-  borderRadius: "5px",
-  cursor: "pointer",
-  fontSize: "0.88rem",
-  fontWeight: "bold",
-  marginTop: "1.5rem",
 };
 
 export default AdvDiary;

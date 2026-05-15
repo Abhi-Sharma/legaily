@@ -25,6 +25,7 @@ if (!mongoUri) {
 }
 
 const authRoutes = require('./routes/authRoutes');
+const diaryRoutes = require('./routes/diaryRoutes');
 
 const app = express();
 app.use(cors());
@@ -37,6 +38,7 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/diary', diaryRoutes);
 
 const PORT = 5001;
 

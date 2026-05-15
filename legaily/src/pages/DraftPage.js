@@ -1,343 +1,305 @@
 import React, { useState, useEffect } from 'react';
 import html2pdf from 'html2pdf.js';
+import axios from 'axios';
 import './DraftPage.css';
 
+const AI_BACKEND_URL = "http://localhost:8000";
+const DIARY_API_URL = "http://localhost:5001/api/diary";
+
 const templates = [
-  'Legal Notice',
   'Bail Application',
+  'Legal Notice',
   'Affidavit',
   'Contract',
-  'PIL (Public Interest Litigation)'
+  'PIL'
 ];
 
 const fieldMap = {
-  'Legal Notice': ['partyName', 'location', 'caseDetails'],
-  'Bail Application': ['partyName', 'location', 'caseDetails', 'date'],
-  'Affidavit': ['partyName', 'location', 'caseDetails', 'date'],
-  'Contract': ['partyName', 'otherParty', 'location', 'caseDetails', 'date'],
-  'PIL (Public Interest Litigation)': ['partyName', 'location', 'caseDetails', 'date']
-};
-
-const templateTextMap = {
-  'Legal Notice': `
-LEGAL NOTICE
-
-Date: [date]
-
-To,
-[partyName]
-[location]
-
-Subject: Legal Notice for [caseDetails]
-
-Sir/Madam,
-
-Under instructions from and on behalf of my client, I hereby serve upon you the following legal notice:
-
-1. That my client is a law-abiding citizen and is engaged in lawful activities.
-2. That on / around __________ (date), you have __________ (acts of the opposite party) which has caused loss / injury to my client.
-3. That your above acts are illegal, arbitrary, and in violation of applicable laws.
-4. That despite repeated requests, you have failed to rectify the issue / comply with lawful demands.
-
-Therefore, you are hereby called upon to:
-
-- __________ (mention demands clearly)
-- Comply within ___ days from receipt of this notice
-
-Failing which, my client shall be constrained to initiate appropriate legal proceedings at your risk, cost, and consequences.
-
-Advocate
-[partyName]
-`,
-  'Bail Application': `
-IN THE COURT OF __________
-
-BAIL APPLICATION NO. ____ OF 20__
-
-IN THE MATTER OF:
-
-[partyName]
-...Applicant
-
-VERSUS
-
-State of [location]
-...Respondent
-
-APPLICATION UNDER SECTION ____ CrPC FOR GRANT OF BAIL
-
-MOST RESPECTFULLY SHOWETH:
-
-1. That the applicant has been falsely implicated in the present case.
-2. That the applicant is innocent and has committed no offence.
-3. That the investigation is in progress / complete and the applicant is cooperating.
-4. That the applicant is not a flight risk and undertakes to appear as and when required.
-5. That no purpose will be served by further detention.
-
-Case / FIR details (as provided):
-[caseDetails]
-
-PRAYER:
-
-It is therefore most respectfully prayed that this Hon’ble Court may kindly grant bail to the applicant in the interest of justice.
-
-AND FOR THIS ACT OF KINDNESS, THE APPLICANT SHALL EVER PRAY.
-
-Place: [location]
-Date: [date]
-
-[Signature]
-Advocate / Applicant
-`,
-  'Affidavit': `
-AFFIDAVIT
-
-I, [partyName], S/o / D/o __________, aged __ years, residing at [location], do hereby solemnly affirm and state:
-
-1. That I am the deponent herein.
-2. That I am fully aware of the facts of this affidavit.
-3. That the statements made herein are true and correct to my knowledge and belief.
-4. That nothing material has been concealed.
-
-DEPONENT
-
-VERIFICATION:
-
-Verified at [location] on this [date] day of __________ 20__ that the contents are true and correct.
-
-DEPONENT
-`,
-  'Contract': `
-AGREEMENT
-
-This Agreement is made on this [date] between:
-
-[partyName], residing at [location] (hereinafter referred to as "First Party")
-
-AND
-
-[otherParty], residing at __________ (hereinafter referred to as "Second Party")
-
-WHEREAS:
-
-- The First Party agrees to [caseDetails]
-- The Second Party agrees to __________
-
-TERMS & CONDITIONS:
-
-1. That the agreement shall be valid for ___ duration.
-2. That consideration amount is Rs. ________.
-3. That both parties agree to fulfill obligations in good faith.
-4. That any dispute shall be subject to jurisdiction of __________ courts.
-
-IN WITNESS WHEREOF both parties have signed this agreement.
-
-First Party Signature: __________
-Second Party Signature: __________
-`,
-  'PIL (Public Interest Litigation)': `
-IN THE HON’BLE HIGH COURT OF __________
-
-WRIT PETITION (PIL) NO. ___ OF 20__
-
-IN THE MATTER OF:
-
-[partyName]
-...Petitioner
-
-VERSUS
-
-State of [location] & Others
-...Respondents
-
-PUBLIC INTEREST LITIGATION UNDER ARTICLE 226 OF THE CONSTITUTION
-
-MOST RESPECTFULLY SHOWETH:
-
-1. That the present petition is filed in public interest.
-2. That the issue concerns [caseDetails] affecting the public at large.
-3. That the respondents have failed to perform their duties.
-4. That no alternative remedy is available.
-
-PRAYER:
-
-It is therefore prayed that this Hon’ble Court may kindly:
-
-- Issue appropriate writ/order/direction
-- Grant any other relief deemed fit
-
-Place: [location]
-Date: [date]
-
-[Signature]
-Petitioner
-`
+  'Bail Application': [
+    { key: 'court_name', label: 'Court Heading', type: 'text', placeholder: 'e.g. IN THE COURT OF THE DISTRICT JUDGE, DELHI' },
+    { key: 'applicant_name', label: 'Applicant Name', type: 'text' },
+    { key: 'case_number', label: 'Case Number', type: 'text' },
+    { key: 'ipc_section', label: 'IPC Section(s)', type: 'text' },
+    { key: 'date', label: 'Date', type: 'date' },
+    { key: 'place', label: 'Place', type: 'text' }
+  ],
+  'Legal Notice': [
+    { key: 'recipient_name', label: 'To (Recipient Name)', type: 'text' },
+    { key: 'recipient_address', label: 'Recipient Address', type: 'textarea' },
+    { key: 'ipc_section', label: 'Under Section', type: 'text' },
+    { key: 'offence_details', label: 'Offence Details', type: 'textarea' },
+    { key: 'damage_details', label: 'Damage/Loss Details', type: 'textarea' },
+    { key: 'time_limit', label: 'Time Limit (Days)', type: 'number' },
+    { key: 'date', label: 'Date', type: 'date' },
+    { key: 'place', label: 'Place', type: 'text' }
+  ],
+  'Affidavit': [
+    { key: 'deponent_name', label: 'Deponent Name', type: 'text' },
+    { key: 'date', label: 'Date', type: 'date' },
+    { key: 'place', label: 'Place', type: 'text' }
+  ],
+  'Contract': [
+    { key: 'party_a_name', label: 'Party A Name', type: 'text' },
+    { key: 'party_b_name', label: 'Party B Name', type: 'text' },
+    { key: 'agreement_terms', label: 'Agreement Terms', type: 'textarea' },
+    { key: 'payment_terms', label: 'Payment Terms', type: 'textarea' },
+    { key: 'date', label: 'Date', type: 'date' }
+  ],
+  'PIL': [
+    { key: 'court_name', label: 'Court Heading', type: 'text', placeholder: 'e.g. IN THE HIGH COURT OF KARNATAKA' },
+    { key: 'petitioner_name', label: 'Petitioner Name', type: 'text' },
+    { key: 'concern_details', label: 'Topic of Public Concern', type: 'textarea' },
+    { key: 'date', label: 'Date', type: 'date' },
+    { key: 'place', label: 'Place', type: 'text' }
+  ]
 };
 
 const Drafts = () => {
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [formData, setFormData] = useState({
-    partyName: '',
-    location: '',
-    otherParty: '',
-    caseDetails: '',
-    date: ''
-  });
+  const [formData, setFormData] = useState({});
+  const [refineTone, setRefineTone] = useState(false);
   const [draftOutput, setDraftOutput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const initialFormState = {
-    partyName: '',
-    location: '',
-    otherParty: '',
-    caseDetails: '',
-    date: ''
-  };
+  
+  // Diary linking state
+  const [diaryEntries, setDiaryEntries] = useState([]);
+  const [selectedEntryId, setSelectedEntryId] = useState('');
+  const [isSavingToDiary, setIsSavingToDiary] = useState(false);
+
+  useEffect(() => {
+    // Page style initialization
+    document.body.style.margin = '0';
+    document.body.style.backgroundColor = '#fff8f0';
+    
+    // Fetch user's diary entries for linking
+    const fetchDiaryEntries = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const res = await axios.get(`${DIARY_API_URL}/all`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        setDiaryEntries(res.data);
+      } catch (err) {
+        console.error("Failed to fetch diary entries", err);
+      }
+    };
+    
+    fetchDiaryEntries();
+
+    return () => {
+      document.body.style.backgroundColor = '';
+    };
+  }, []);
 
   const handleTemplateChange = (e) => {
     const nextTemplate = e.target.value;
     setSelectedTemplate(nextTemplate);
     setDraftOutput('');
-    setIsLoading(false);
-    setFormData(initialFormState);
+    setFormData({});
   };
 
-  const handleGenerateDraft = () => {
+  const handleInputChange = (key, value) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleGenerateDraft = async () => {
     setIsLoading(true);
-
-    setTimeout(() => {
-      const filledTemplate = (templateTextMap[selectedTemplate] || '[Template not available]')
-        .replaceAll('[partyName]', formData.partyName.trim())
-        .replaceAll('[location]', formData.location.trim())
-        .replaceAll('[otherParty]', formData.otherParty.trim())
-        .replaceAll('[caseDetails]', formData.caseDetails.trim())
-        .replaceAll('[date]', formData.date);
-
-      setDraftOutput(filledTemplate.trim());
+    try {
+      const response = await axios.post(`${AI_BACKEND_URL}/api/draft/`, {
+        template_id: selectedTemplate,
+        data: formData,
+        refine_tone: refineTone
+      });
+      setDraftOutput(response.data.result);
+    } catch (error) {
+      console.error("Error generating draft:", error);
+      alert("Failed to generate draft. Please check if the backend is running.");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   useEffect(() => {
     if (!isLoading && draftOutput) {
-      window.scrollTo(0, 0);
+      const element = document.getElementById('draftPreview');
+      if (element) element.scrollIntoView({ behavior: 'smooth' });
     }
   }, [isLoading, draftOutput]);
 
   const downloadPDF = () => {
-    const element = document.getElementById('draftPreview');
-    html2pdf().set({
-      margin: 1,
+    const element = document.getElementById('draftContent');
+    const opt = {
+      margin: [1, 1, 1, 1.1],
       filename: `${selectedTemplate.replace(/\s+/g, '_')}_Draft.pdf`,
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    }).from(element).save();
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'in', format: 'legal', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
   };
 
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(draftOutput || '');
-    } catch {
-      // no-op (clipboard can fail on insecure contexts)
+      alert("Draft copied to clipboard!");
+    } catch (err) {
+      console.error("Clipboard failed", err);
     }
   };
 
-  const renderInput = (field) => {
-    const labels = {
-      partyName: "Party Name",
-      location: "Location",
-      otherParty: "Other Party",
-      caseDetails: "Case Details",
-      date: "Date"
-    };
+  const saveToDiary = async () => {
+    if (!selectedEntryId) {
+      alert("Please select a Case/Diary Entry to save this document to.");
+      return;
+    }
+    
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please login first to save documents.");
+      return;
+    }
 
-    return (
-      <div className="form-group" key={field}>
-        <label>{labels[field]}</label>
-        {field === 'caseDetails' ? (
-          <textarea
-            rows={6}
-            value={formData[field]}
-            onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
-            placeholder={`Enter ${labels[field]}`}
-          />
-        ) : (
-          <input
-            type={field === 'date' ? 'date' : 'text'}
-            value={formData[field]}
-            onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
-            placeholder={`Enter ${labels[field]}`}
-          />
-        )}
-      </div>
-    );
+    setIsSavingToDiary(true);
+    try {
+      const payload = {
+        title: `${selectedTemplate} - Auto Generated`,
+        type: 'AI_GENERATED',
+        content: draftOutput
+      };
+
+      await axios.post(`${DIARY_API_URL}/${selectedEntryId}/link-document`, payload, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      alert("Success! Document saved to your Diary Entry.");
+      setSelectedEntryId(''); // reset selection
+    } catch (err) {
+      console.error("Failed to link document", err);
+      alert("Failed to save to Diary.");
+    } finally {
+      setIsSavingToDiary(false);
+    }
   };
 
   return (
-    <div className="drafts-container">
+    <div className="drafts-page">
       {isLoading && (
         <div className="full-screen-overlay">
-          <div className="spinner"></div>
+          <div className="spinner-container">
+            <div className="spinner"></div>
+            <p>Drafting Court-Ready Document...</p>
+          </div>
         </div>
       )}
 
-      <h1>📄 Legal Draft Generator</h1>
+      <div className="draft-container">
+        <header className="draft-header-minimal">
+          <h1>🧑‍⚖️ Draft Generator</h1>
+        </header>
 
-      <div className="form-group">
-        <label>Select Template</label>
-        <select value={selectedTemplate} onChange={handleTemplateChange}>
-          <option value="">-- Choose Template --</option>
-          {templates.map((template, idx) => (
-            <option key={idx} value={template}>{template}</option>
-          ))}
-        </select>
-      </div>
+        <main className="draft-main">
+          <section className="form-section">
+            <div className="form-group mb-4">
+              <label>Choose Document Type</label>
+              <select value={selectedTemplate} onChange={handleTemplateChange}>
+                <option value="">-- Select Template --</option>
+                {templates.map((t, idx) => (
+                  <option key={idx} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
 
-      {selectedTemplate && (
-        <div className="form-section">
-          {fieldMap[selectedTemplate].map(renderInput)}
-        </div>
-      )}
-
-      <button className="generate-btn" onClick={handleGenerateDraft} disabled={!selectedTemplate}>
-        Generate Draft
-      </button>
-
-      {draftOutput && (
-        <>
-          <div id="draftPreview" className="draft-template-page">
-            <div className="draft-template-topbar">
-              <div className="draft-template-date">
-                {new Date().toLocaleString()}
+            {selectedTemplate && (
+              <div className="template-fields-grid">
+                {fieldMap[selectedTemplate].map((field) => (
+                  <div key={field.key} className={`form-group ${field.type === 'textarea' ? 'full-width' : ''}`}>
+                    <label>{field.label}</label>
+                    {field.type === 'textarea' ? (
+                      <textarea
+                        rows={5}
+                        value={formData[field.key] || ''}
+                        onChange={(e) => handleInputChange(field.key, e.target.value)}
+                        placeholder={field.placeholder || `Provide details for ${field.label}...`}
+                      />
+                    ) : (
+                      <input
+                        type={field.type}
+                        value={formData[field.key] || ''}
+                        onChange={(e) => handleInputChange(field.key, e.target.value)}
+                        placeholder={field.placeholder || `Enter ${field.label}`}
+                      />
+                    )}
+                  </div>
+                ))}
               </div>
-              <div className="draft-template-title">Court Draft Templates</div>
-              <div className="draft-template-spacer" />
-            </div>
+            )}
 
-            <div className="draft-template-section-title">
-              <span className="draft-template-section-icon" aria-hidden="true">📄</span>
-              <span className="draft-template-section-number">1.</span>
-              <span className="draft-template-section-name">{selectedTemplate} Template</span>
-            </div>
-
-            <div className="draft-template-card">
-              <div className="draft-template-card-header">
-                <span className="draft-template-card-header-left">Writing</span>
-                <button
-                  type="button"
-                  className="draft-template-copy-btn"
-                  onClick={copyToClipboard}
-                  title="Copy"
+            {selectedTemplate && (
+              <div className="draft-actions">
+                <label className="ai-toggle">
+                  <input 
+                    type="checkbox" 
+                    checked={refineTone} 
+                    onChange={(e) => setRefineTone(e.target.checked)} 
+                  />
+                  <span>Refine Tone (Experimental AI)</span>
+                </label>
+                <button 
+                  className="generate-btn" 
+                  onClick={handleGenerateDraft}
+                  disabled={!selectedTemplate}
                 >
-                  ⧉
+                  Generate Professional Draft
                 </button>
               </div>
-              <pre className="draft-template-content">{draftOutput}</pre>
-            </div>
-          </div>
+            )}
+          </section>
 
-          <button className="download-btn" onClick={downloadPDF}>Download as PDF</button>
-        </>
-      )}
+          {draftOutput && (
+            <section id="draftPreview" className="preview-section">
+              <div className="preview-toolbar">
+                <h3>Draft Preview</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                   <select 
+                     value={selectedEntryId} 
+                     onChange={(e) => setSelectedEntryId(e.target.value)}
+                     style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ffcc99', fontSize: '0.9rem', outline: 'none', minWidth: '180px', color: '#333' }}
+                   >
+                     <option value="">-- Save to Diary Entry --</option>
+                     {diaryEntries.map(entry => (
+                       <option key={entry._id} value={entry._id}>
+                         {entry.partyName} ({new Date(entry.date).toLocaleDateString()})
+                       </option>
+                     ))}
+                   </select>
+                   <button 
+                     onClick={saveToDiary} 
+                     disabled={!selectedEntryId || isSavingToDiary}
+                     className="btn-primary"
+                     style={{ 
+                       background: selectedEntryId ? '#ff8c00' : '#ccc',
+                       opacity: selectedEntryId ? 1 : 0.7,
+                       boxShadow: selectedEntryId ? '0 2px 8px rgba(255, 140, 0, 0.2)' : 'none'
+                     }}
+                   >
+                     {isSavingToDiary ? 'Saving...' : 'Link Document'}
+                   </button>
+                </div>
+
+                <div className="toolbar-buttons">
+                  <button onClick={copyToClipboard} className="btn-secondary">Copy Text</button>
+                  <button onClick={downloadPDF} className="btn-primary">Download PDF</button>
+                </div>
+              </div>
+
+              <div id="draftContent" className="legal-paper">
+                <pre className="draft-body">{draftOutput}</pre>
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
     </div>
   );
 };

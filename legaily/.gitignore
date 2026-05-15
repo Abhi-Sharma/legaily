@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.js
 
@@ -18,8 +18,18 @@
 .env.test.local
 .env.production.local
 .env
-.pyc
-__pycache__/
+*.pyc
+**/__pycache__/
+
+# FAISS / vector indexes
+ipc_index/
+ipc_index_sample/
+legal_statutes_index/
+
+# Test reports
+*.json
+!package.json
+!package-lock.json
 
 npm-debug.log*
 yarn-debug.log*
